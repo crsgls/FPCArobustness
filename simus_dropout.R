@@ -3,6 +3,7 @@ library(mvtnorm)
 library(splines)
 library(lme4)
 library(fdapace)
+library(face)
 library(MFPCA)
 library(lcmm)
 library(tidyverse)
@@ -259,7 +260,7 @@ simuRMSE <- function(dt, nmes, tmax, trainsize, testsize, missing, txdo, scen, e
   # estimation
   fpca_est_fve09 <- FPCA(dt_Ly_train, dt_Lt_train, list(dataType = "Sparse", FVEthreshold = 0.9, usergrid = TRUE))
   fpca_est_fve099 <- FPCA(dt_Ly_train, dt_Lt_train, list(dataType = "Sparse", FVEthreshold = 0.99, usergrid = TRUE))
-  fpca_est_K4 <- FPCA(dt_Ly_train, dt_Lt_train, list(dataType = "Sparse", methodSelectK = as.integer(4), usergrid = TRUE))
+  fpca_est_face <- face.sparse(na.omit(data.frame(y=dt_long_train$y, argvals = dt_long_train$t, subj = dt_long_train$id)))
   
   # prediction on test data
   fpca_pred_obj_fve09 <- predict(fpca_est_fve09, dt_Ly_test, dt_Lt_test)
@@ -268,9 +269,7 @@ simuRMSE <- function(dt, nmes, tmax, trainsize, testsize, missing, txdo, scen, e
   fpca_pred_obj_fve099 <- predict(fpca_est_fve099, dt_Ly_test, dt_Lt_test)
   fpca_pred_fve099 <- as.numeric(t(fpca_pred_obj_fve099$predCurves))
   fpca_pred_fve099 <- fpca_pred_fve099[unlist(lapply(dt_Lt_test, function(x) return(fpca_pred_obj_fve099$predGrid %in% x)))]
-  fpca_pred_obj_K4 <- predict(fpca_est_K4, dt_Ly_test, dt_Lt_test)
-  fpca_pred_K4 <- as.numeric(t(fpca_pred_obj_K4$predCurves))
-  fpca_pred_K4 <- fpca_pred_K4[unlist(lapply(dt_Lt_test, function(x) return(fpca_pred_obj_K4$predGrid %in% x)))]
+  fpca_pred_face <- predict(fpca_est_face, newdata = data.frame(y=dt_long_test$y, argvals = dt_long_test$t, subj = dt_long_test$id))
   
   # RMSE ======================================================================= HERE TO CHANGE !!!!!
   
@@ -335,16 +334,16 @@ simuRMSE <- function(dt, nmes, tmax, trainsize, testsize, missing, txdo, scen, e
   fpca_RMSE_fve099_NA <- sqrt(mean(as.numeric(by(fpca_predtab_fve099_NA, fpca_predtab_fve099_NA$id, function(x) return(t(x$diff) %*% x$diff)))))
   fpca_RMSE_fve099_obs <- sqrt(mean(as.numeric(by(fpca_predtab_fve099_obs, fpca_predtab_fve099_obs$id, function(x) return(t(x$diff) %*% x$diff)))))
   
-  # rmse for FPCA with K = 4
-  fpca_predtab_K4 <- data.frame("diff" = fpca_pred_K4 - dt_long_test$yfull, "miss" = is.na(dt_long_test$y)*1, "id" = dt_long_test$id)
-  fpca_predtab_K4_NA <- fpca_predtab_K4[fpca_predtab_K4$miss == 1,]
-  fpca_predtab_K4_obs <- fpca_predtab_K4[fpca_predtab_K4$miss == 0,]
-  fpca_RMSE_K4_NA <- sqrt(mean(as.numeric(by(fpca_predtab_K4_NA, fpca_predtab_K4_NA$id, function(x) return(t(x$diff) %*% x$diff)))))
-  fpca_RMSE_K4_obs <- sqrt(mean(as.numeric(by(fpca_predtab_K4_obs, fpca_predtab_K4_obs$id, function(x) return(t(x$diff) %*% x$diff)))))
-
-  res = c(txevent, meanNA, meanNAdo, n_suj_NA, fpca_est_fve09$selectK, fpca_est_fve099$selectK, lmm_RMSE_complete_NA, lmm_RMSE_complete_obs, 
-          lmm_RMSE_quad_NA, lmm_RMSE_quad_obs, lmm_RMSE_cub_NA, lmm_RMSE_cub_obs, lmm_RMSE_spl_NA, lmm_RMSE_spl_obs, lmm_RMSE_spl2_NA, lmm_RMSE_spl2_obs, 
-          JM_RMSE_NA, JM_RMSE_obs, fpca_RMSE_fve09_NA, fpca_RMSE_fve09_obs, fpca_RMSE_fve099_NA, fpca_RMSE_fve099_obs, fpca_RMSE_K4_NA, fpca_RMSE_K4_obs)
+  # rmse for FPCA with FACE
+  fpca_predtab_face <- data.frame("diff" = fpca_pred_face$y.pred - dt_long_test$yfull, "miss" = is.na(dt_long_test$y)*1, "id" = dt_long_test$id)
+  fpca_predtab_face_NA <- fpca_predtab_face[fpca_predtab_face$miss == 1,]
+  fpca_predtab_face_obs <- fpca_predtab_face[fpca_predtab_face$miss == 0,]
+  fpca_RMSE_face_NA <- sqrt(mean(as.numeric(by(fpca_predtab_face_NA, fpca_predtab_face_NA$id, function(x) return(t(x$diff) %*% x$diff)))))
+  fpca_RMSE_face_obs <- sqrt(mean(as.numeric(by(fpca_predtab_face_obs, fpca_predtab_face_obs$id, function(x) return(t(x$diff) %*% x$diff)))))
+  
+  res = c(txevent, meanNA, meanNAdo, n_suj_NA, fpca_est_fve09$selectK, fpca_est_fve099$selectK, lmm_RMSE_complete_NA, lmm_RMSE_complete_obs,
+          lmm_RMSE_quad_NA, lmm_RMSE_quad_obs, lmm_RMSE_cub_NA, lmm_RMSE_cub_obs, lmm_RMSE_spl_NA, lmm_RMSE_spl_obs, lmm_RMSE_spl2_NA, lmm_RMSE_spl2_obs,
+          JM_RMSE_NA, JM_RMSE_obs, fpca_RMSE_fve09_NA, fpca_RMSE_fve09_obs, fpca_RMSE_fve099_NA, fpca_RMSE_fve099_obs, fpca_RMSE_face_NA, fpca_RMSE_face_obs)
   
   return(res)
 
@@ -377,10 +376,10 @@ while (error == TRUE){
   
   # prediction of all models on all missing data schemes
   
-  out <- matrix(NA, ncol = 24, nrow = 6); idx = 1
-  for (missing in c("fixed", "threshMAR", "incrMAR", "threshMNAR", "incrMNAR", "MCAR")){
-  # out <- matrix(NA, ncol = 24, nrow = 4); idx = 1
-  # for (missing in c("fixed", "threshMAR", "incrMAR", "MCAR")){
+  # out <- matrix(NA, ncol = 24, nrow = 6); idx = 1
+  # for (missing in c("fixed", "threshMAR", "incrMAR", "threshMNAR", "incrMNAR", "MCAR")){
+  out <- matrix(NA, ncol = 24, nrow = 4); idx = 1
+  for (missing in c("fixed", "threshMAR", "incrMAR", "MCAR")){
     print(missing)
     outmiss <- try(simuRMSE(dt, nmes, tmax, trainsize, testsize, missing, txdo, scen, est_compl), silent = TRUE)
     error = inherits(outmiss, "try-error")
@@ -395,8 +394,20 @@ while (error == TRUE){
   attempts <- attempts + 1
 }
 
+# colnames
+colnames(out) = c("txevent", "meanNA", "meanNAdo", "n_suj_NA", "fcpa_est_fve90_selectK", "fcpa_est_fve99_selectK",
+                  "lmm_RMSE_complete_NA", "lmm_RMSE_complete_obs",
+                  "lmm_RMSE_quad_NA", "lmm_RMSE_quad_obs",
+                  "lmm_RMSE_cub_NA", "lmm_RMSE_cub_obs",
+                  "lmm_RMSE_spl_NA", "lmm_RMSE_spl_obs",
+                  "lmm_RMSE_spl2_NA", "lmm_RMSE_spl2_obs",
+                  "JM_RMSE_NA", "JM_RMSE_obs",
+                  "fpca_RMSE_fve90_NA", "fpca_RMSE_fve90_obs",
+                  "fpca_RMSE_fve99_NA", "fpca_RMSE_fve99_obs",
+                  "fpca_RMSE_face_NA", "fpca_RMSE_face_obs")
+
 # save number of attempts
-out <- cbind(out, rep(attempts, dim(out)[1]))
+out <- cbind(out, "attempts"=rep(attempts, dim(out)[1]))
 
 # saving output
 
